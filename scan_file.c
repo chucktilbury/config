@@ -9,7 +9,7 @@
 
 
 
-#include "scan.h"
+#include "scan_file.h"
 #include "memory.h"
 
 typedef struct {
@@ -24,13 +24,13 @@ typedef struct {
 static scanner_t* scanner;
 
 static int get_char(void) {
-    
+
     return scanner->ch;
 }
 
 static int consume_char(void) {
-    
-    if(feof(scanner->fp)) 
+
+    if(feof(scanner->fp))
         return scanner->ch;
     else if(scanner->ch == '\n') {
         scanner->line++;
@@ -38,24 +38,24 @@ static int consume_char(void) {
     }
     else
         scanner->col++;
-        
+
     scanner->ch = fgetc(scanner->fp);
     if(scanner->ch == EOF)
-    
+
         clear_string(scanner->tok.str);
     return scanner->ch;
 }
 
 static int is_name_stopper(int ch) {
-    
+
     if(isalpha(ch) || ch == '_')
         return 0;
-    else 
+    else
         return 1;
 }
 
 static int is_value_stopper(int ch) {
-    
+
     if(ch == '{' || ch == '}' || ch == '=' || ch == ';' || ch == '\n' || ch == EOF)
         return 1;
     else
@@ -63,9 +63,9 @@ static int is_value_stopper(int ch) {
 }
 
 static void consume_comment(void) {
-    
+
     int ch;
-    
+
     do {
         ch = consume_char();
     } while(ch != '\n' && ch != EOF);
@@ -74,27 +74,27 @@ static void consume_comment(void) {
 static void scan_name(void) {
 
     int ch = get_char();
-    
+
     while(!is_name_stopper(ch)) {
         append_string_char(scanner->tok.str, ch);
         ch = consume_char();
-    }     
-    
+    }
+
     scanner->tok.type = TOK_NAME;
 }
 
 static void scan_string(void) {
-    
+
     int ch, ender = get_char();
     ch = consume_char();
-    
+
     while(ch != ender && ch != EOF) {
         append_string_char(scanner->tok.str, ch);
         ch = consume_char();
-    } 
-    
+    }
+
     if(ch == EOF) {
-        fprintf(stderr, "ERROR: %s: %d: %d: Unexpected end of file\n", 
+        fprintf(stderr, "ERROR: %s: %d: %d: Unexpected end of file\n",
                 get_fname(), get_line_no(), get_col_no());
         exit(1);
     }
@@ -105,13 +105,13 @@ static void scan_string(void) {
 }
 
 static void scan_value(void) {
-    
+
     int ch = get_char();
-    
+
     while(isspace(ch)) {
         ch = consume_char();
     }
-    
+
     if(ch == EOF) {
         fprintf(stderr, "ERROR: %s: %d: %d: Expected a value but got EOF\n",
                     get_fname(), get_line_no(), get_col_no());
@@ -121,18 +121,18 @@ static void scan_value(void) {
         fprintf(stderr, "ERROR: %s: %d: %d: Expected a value but got '%c'\n",
                     get_fname(), get_line_no(), get_col_no(), ch);
         exit(1);
-    }        
-    
+    }
+
     if(ch == '\'' || ch == '\"')
         scan_string();
     else {
-        while(!is_value_stopper(ch)) { 
+        while(!is_value_stopper(ch)) {
             append_string_char(scanner->tok.str, ch);
             ch = consume_char();
         }
         strip_string(scanner->tok.str);
     }
-    
+
     scanner->tok.type = TOK_VALUE;
 }
 
@@ -145,14 +145,14 @@ static void scan_value(void) {
  * Initialize the scanner. This must be called before reading any characters.
  */
 void init_scanner(const char* fname) {
-    
+
     FILE* fp = fopen(fname, "r");
     if(fp == NULL) {
         fprintf(stderr, "ERROR: Unable to open input file %s: %s\n",
                 fname, strerror(errno));
         exit(1);
     }
-    
+
     scanner = _ALLOC_DS(scanner_t);
     scanner->fp = fp;
     scanner->fname = _DUP_STR(fname);
@@ -161,7 +161,7 @@ void init_scanner(const char* fname) {
     scanner->tok.str = create_string(NULL);
     scanner->tok.type = TOK_NO_TOKEN;
     scanner->ch = fgetc(fp);
-    
+
     consume_token();
 }
 
@@ -169,10 +169,10 @@ void init_scanner(const char* fname) {
  * Dispose of the current token and get the next one. Return a pointer to it.
  */
 token_t* consume_token(void) {
-    
+
     clear_string(scanner->tok.str);
     int finished = 0;
-    
+
     while(!finished) {
         int ch = get_char();
         switch(ch) {
@@ -217,7 +217,7 @@ token_t* consume_token(void) {
                 break;
         }
     }
-        
+
     return &scanner->tok;
 }
 
@@ -225,7 +225,7 @@ token_t* consume_token(void) {
  * Return a pointer to the current token.
  */
 token_t* get_token(void) {
-    
+
     return &scanner->tok;
 }
 
@@ -233,7 +233,7 @@ token_t* get_token(void) {
  * Return the current line number.
  */
 int get_line_no(void) {
-    
+
     return scanner->line;
 }
 
@@ -241,7 +241,7 @@ int get_line_no(void) {
  * Return the current column number.
  */
 int get_col_no(void) {
-    
+
     return scanner->col;
 }
 
@@ -249,7 +249,7 @@ int get_col_no(void) {
  * Return the current file name.
  */
 const char* get_fname(void) {
-    
+
     return scanner->fname;
 }
 
@@ -272,23 +272,23 @@ static const char* type_to_str(int type) {
 }
 
 static void dump_token(token_t* tok) {
-    
-    printf("token str: \"%s\" type: %s (%d) %d: %d\n", 
+
+    printf("token str: \"%s\" type: %s (%d) %d: %d\n",
             tok->str->buf, type_to_str(tok->type), tok->type,
             get_line_no(), get_col_no());
 }
 
 int main(void) {
- 
+
     init_scanner("test.cfg");
     token_t* tok = get_token();
-    
+
     while(tok->type != TOK_END_OF_FILE) {
         dump_token(tok);
         tok = consume_token();
-    } 
+    }
     dump_token(tok);
-    
+
     return 0;
 }
 

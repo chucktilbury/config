@@ -1,15 +1,17 @@
 /*
  * Config file parser implementation.
  */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <ctype.h>
 #include <string.h>
+#include <unistd.h>
 
-#include "scan.h"
+#include "scan_file.h"
 #include "str.h"
-#include "parse.h"
+#include "parse_file.h"
 #include "memory.h"
 
 #define FATAL(f, ...) do { \
@@ -38,25 +40,25 @@
 
 typedef struct {
     string_t** list;
-    int len; 
+    int len;
     int cap;
 } context_t;
 
 static context_t* context;
 
-void push_context(string_t* name) {
-    
+static inline void push_context(string_t* name) {
+
     if(context->len+1 > context->cap) {
         context->cap <<= 1;
         context->list = _REALLOC_ARRAY(context->list, string_t*, context->cap);
     }
-    
+
     context->list[context->len] = create_string(name->buf);
     context->len++;
 }
 
-void pop_context(void) {
-    
+static inline void pop_context(void) {
+
     if(context->len) {
         context->len--;
         destroy_string(context->list[context->len]);
@@ -68,10 +70,10 @@ void pop_context(void) {
     }
 }
 
-const char* context_name(string_t* name) {
-    
+static inline const char* context_name(string_t* name) {
+
     string_t* str = create_string(NULL);
-    
+
     if(context->len) {
         append_string_string(str, context->list[0]);
         for(int i = 1; i < context->len; i++) {
@@ -80,34 +82,58 @@ const char* context_name(string_t* name) {
         }
         append_string_char(str, '.');
     }
-    
+
     append_string_string(str, name);
-    
+
     return str->buf;
 }
 
+const char* find_config_file(config_t* cfg) {
+
+    char buffer[256];
+
+    const char* str = canonicalize_file_name(cfg->pname);
+
+    strncpy(buffer, str, sizeof(buffer)-1);
+    size_t len = strlen(buffer);
+    strncat(buffer, ".cfg", sizeof(buffer)-1-len);
+
+    if(access(buffer, R_OK)) {
+        fprintf(stderr, "WARNING: Cannot open configuration file: %s: %s\n",
+                    buffer, strerror(errno));
+        return NULL;
+    }
+
+    printf("config file: %s\n", buffer);
+    return _DUP_STR(buffer);
+}
 
 /*
  * Load the whole configuration file and deliver the result.
  */
-hash_table_t* load_config(const char* fname) {
-    
+void load_config_file(config_t* cfg) {
+
+    hash_table_t* table = cfg->vars;
+    const char* fname = find_config_file(cfg);
+    if(fname == NULL)
+        return;
+
     init_scanner(fname);
-    hash_table_t* table = create_hash_table();
+
     context = _ALLOC_DS(context_t);
     context->cap = 1 << 3;
     context->len = 0;
     context->list = _ALLOC_ARRAY(string_t*, context->cap);
-    
+
     int finished = 0;
     int state = 0;
-    
+
     string_t* name = create_string(NULL);
 
     while(!finished) {
         token_t* tok = get_token();
         switch(state) {
-            
+
             case 0:
                 TRACE;
                 // expecting a name or an error
@@ -124,12 +150,12 @@ hash_table_t* load_config(const char* fname) {
                     exit(1);
                 }
                 break;
-                
+
             case 1:
                 TRACE;
                 // expecting a value or a '{'
                 if(tok->type == TOK_VALUE) {
-                    add_table_entry(table, context_name(name), tok->str->buf);
+                    add_table_entry(table, context_name(name), copy_string(tok->str));
                     clear_string(name);
                     consume_token();
                     state = 2;
@@ -145,7 +171,7 @@ hash_table_t* load_config(const char* fname) {
                     exit(1);
                 }
                 break;
-                
+
             case 2:
                 TRACE;
                 // need a NAME or a '}'
@@ -169,14 +195,12 @@ hash_table_t* load_config(const char* fname) {
                 break;
         }
     }
-    
+
     if(context->len != 0) {
         ERROR("Unexpected end of file, imbalanced '{}'");
         exit(1);
     }
-    
+
     _FREE(context->list);
     _FREE(context);
-    
-    return table;
 }

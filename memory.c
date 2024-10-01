@@ -42,9 +42,9 @@ void* mem_dup(void* ptr, size_t size) {
     return nptr;
 }
 
-const char* mem_dup_str(const char* ptr) {
+char* mem_dup_str(const char* ptr) {
     
-    return (const char*)mem_dup((void*)ptr, strlen(ptr) + 1);
+    return (char*)mem_dup((void*)ptr, strlen(ptr) + 1);
 }
 
 void mem_free(void* ptr) {

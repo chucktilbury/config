@@ -1,8 +1,8 @@
 /*
  * Scanner public interface.
  */
-#ifndef _SCAN_H_
-#define _SCAN_H_
+#ifndef _SCAN_FILE_H_
+#define _SCAN_FILE_H_
 
 #include "str.h"
 
@@ -17,7 +17,7 @@ typedef enum {
     TOK_END_OF_FILE, // end of input
 } token_type_t;
 
-typedef struct {
+typedef struct _token_t_ {
     string_t* str;
     token_type_t type;
 } token_t;
@@ -29,4 +29,4 @@ int get_line_no(void);
 int get_col_no(void);
 const char* get_fname(void);
 
-#endif /* _SCAN_H_ */
+#endif /* _SCAN_FILE_H_ */

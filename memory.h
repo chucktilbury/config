@@ -18,7 +18,7 @@
 void* mem_alloc(size_t size);
 void* mem_realloc(void* ptr, size_t size);
 void* mem_dup(void* ptr, size_t size);
-const char* mem_dup_str(const char* ptr);
+char* mem_dup_str(const char* ptr);
 void mem_free(void* ptr);
 
 #endif /* _MEMORY_H_ */
